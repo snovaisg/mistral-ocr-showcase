@@ -17,6 +17,7 @@ Hugging Face Space: https://huggingface.co/spaces/snovaisg/mistral-ocr-showcase
 This project is a Streamlit app for extracting and reviewing lab report data:
 - OCR extraction from PDF lab reports using Mistral (`mistral-ocr-latest`)
 - Follow-up structured analysis via OpenAI (`gpt-4o`)
+- Batch extraction from ZIP files containing multiple PDFs
 - Side-by-side UX for extraction output and guided prompts
 
 Users provide their own API keys at runtime.
@@ -31,12 +32,14 @@ Users provide their own API keys at runtime.
 ## Features
 
 - PDF upload or public PDF URL input
+- ZIP upload for multi-document extraction
 - OCR markdown rendering with embedded inline images
 - Raw OCR markdown inspector
 - Lab-focused chat prompts for:
   - biomarker tables
   - abnormal/out-of-range value detection
   - follow-up discussion prep
+- Field-based batch extraction where missing fields are returned as `not found in document`
 
 ## Run Locally
 
