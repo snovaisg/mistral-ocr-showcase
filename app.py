@@ -30,8 +30,10 @@ for _k, _v in {
     "ocr_markdown": None,
     "ocr_images": {},
     "ocr_done": False,
+    "ocr_source_signature": None,
     "chat_history": [],
     "chat_input": "",
+    "selected_quick_prompt": "",
     "batch_results": [],
     "batch_done": False,
     "batch_prompt_preview": "",
@@ -253,12 +255,11 @@ with st.sidebar:
     st.subheader("Lab Report Input")
     input_method = st.radio(
         "Input method",
-        ["Upload PDF", "Enter URL", "Upload ZIP (Batch)"],
+        ["Upload PDF", "Upload ZIP (Batch)"],
         label_visibility="collapsed",
     )
 
     uploaded_file = None
-    pdf_url = ""
     uploaded_zip = None
 
     if input_method == "Upload PDF":
@@ -270,12 +271,6 @@ with st.sidebar:
         )
         if uploaded_file:
             st.success(f"Ready: **{uploaded_file.name}**")
-    elif input_method == "Enter URL":
-        pdf_url = st.text_input(
-            "Lab report PDF URL",
-            placeholder="https://example.com/lab-results.pdf",
-            label_visibility="collapsed",
-        )
     else:
         uploaded_zip = st.file_uploader(
             "Upload ZIP with PDF files",
@@ -494,20 +489,14 @@ st.caption(
 )
 
 # Readiness flags
-has_document = (uploaded_file is not None) or bool(pdf_url.strip())
-can_ocr = bool(mistral_key) and has_document
+has_document = uploaded_file is not None
 
-# --- OCR button --------------------------------------------------------------
-ocr_btn = st.button(
-    "Extract Lab Report Text",
-    type="primary",
-    disabled=not can_ocr,
-    help=(
-        "Add a Mistral API key and a document in the sidebar to enable."
-        if not can_ocr
-        else "Run OCR on the selected document."
-    ),
-)
+if not has_document and st.session_state.ocr_source_signature is not None:
+    st.session_state.ocr_markdown = None
+    st.session_state.ocr_images = {}
+    st.session_state.ocr_done = False
+    st.session_state.chat_history = []
+    st.session_state.ocr_source_signature = None
 
 if not has_document and not st.session_state.ocr_done:
     st.info(
@@ -515,21 +504,29 @@ if not has_document and not st.session_state.ocr_done:
         "to start extraction."
     )
 
-if ocr_btn and can_ocr:
-    with st.spinner("Extracting lab report text with Mistral OCR..."):
-        try:
-            pdf_bytes = uploaded_file.read() if uploaded_file else None
-            url = pdf_url.strip() if not pdf_bytes else None
+if has_document and not mistral_key:
+    st.warning("Add your **Mistral API key** in the sidebar to start OCR automatically.")
 
-            result = run_ocr(mistral_key, pdf_bytes=pdf_bytes, url=url)
+if has_document and mistral_key:
+    pdf_bytes = uploaded_file.getvalue()
+    head = pdf_bytes[:32].hex()
+    tail = pdf_bytes[-32:].hex() if len(pdf_bytes) > 32 else ""
+    doc_signature = f"{uploaded_file.name}:{len(pdf_bytes)}:{head}:{tail}"
 
-            st.session_state.ocr_markdown = _combine_markdown(result)
-            st.session_state.ocr_images = _build_image_map(result)
-            st.session_state.ocr_done = True
-            st.session_state.chat_history = []
-            st.rerun()
-        except Exception as exc:
-            st.error(f"OCR failed: {exc}")
+    if st.session_state.ocr_source_signature != doc_signature:
+        with st.spinner("Extracting lab report text with Mistral OCR..."):
+            try:
+                result = run_ocr(mistral_key, pdf_bytes=pdf_bytes)
+
+                st.session_state.ocr_markdown = _combine_markdown(result)
+                st.session_state.ocr_images = _build_image_map(result)
+                st.session_state.ocr_done = True
+                st.session_state.chat_history = []
+                st.session_state.ocr_source_signature = doc_signature
+                st.rerun()
+            except Exception as exc:
+                st.session_state.ocr_done = False
+                st.error(f"OCR failed: {exc}")
 
 # --- OCR results -------------------------------------------------------------
 if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
@@ -556,19 +553,21 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
         if st.button("Clear chat", help="Reset the conversation history"):
             st.session_state.chat_history = []
             st.session_state.chat_input = ""
+            st.session_state.selected_quick_prompt = ""
             st.rerun()
 
     st.write("Quick extraction prompts:")
     prompt_cols = st.columns(3)
     prompt_options = [
-        "Extract all biomarkers with result, unit, and reference range in a table.",
-        "List all abnormal or out-of-range values and explain why each is abnormal.",
-        "Summarize key findings and suggested follow-up questions for my doctor.",
+        "Qual o nome do doente?",
+        "Qual o médico que receitou o exame?",
+        "Algum valor do laboratório fora do padrão?",
     ]
     for idx, prompt in enumerate(prompt_options):
         with prompt_cols[idx]:
             if st.button(f"Use prompt {idx + 1}", key=f"quick_prompt_{idx}"):
                 st.session_state.chat_input = prompt
+                st.session_state.selected_quick_prompt = prompt
                 st.rerun()
 
     if not openai_key:
@@ -590,16 +589,18 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
             )
             submit_btn = st.form_submit_button("Submit", type="primary")
 
-        if submit_btn and user_question.strip():
+        effective_question = user_question.strip() or st.session_state.selected_quick_prompt.strip()
+        if submit_btn and effective_question:
             with st.spinner("Thinking..."):
                 try:
                     answer = run_chat(
                         openai_key,
                         st.session_state.ocr_markdown,
-                        user_question.strip(),
+                        effective_question,
                         st.session_state.chat_history,
                     )
-                    st.session_state.chat_history.append((user_question.strip(), answer))
+                    st.session_state.chat_history.append((effective_question, answer))
+                    st.session_state.selected_quick_prompt = ""
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Chat failed: {exc}")
