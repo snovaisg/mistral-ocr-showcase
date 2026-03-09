@@ -16,6 +16,7 @@ docker build -t lab-results-extractor:local .
 ```
   2. Run container for local test:
 ```bash
+docker rm -f lab-results-extractor >/dev/null 2>&1 || true
 docker run --rm -p 7860:7860 --name lab-results-extractor lab-results-extractor:local
 ```
   3. Open app:
@@ -31,5 +32,9 @@ docker run --rm -p 7860:7860 --name lab-results-extractor lab-results-extractor:
 ## Quick Rebuild + Test
 
 ```bash
-docker build -t lab-results-extractor:local . && docker run --rm -p 7860:7860 --name lab-results-extractor lab-results-extractor:local
+docker build -t lab-results-extractor:local . && docker rm -f lab-results-extractor >/dev/null 2>&1 || true && docker run --rm -p 7860:7860 --name lab-results-extractor lab-results-extractor:local
 ```
+
+## Mandatory Post-Change Check
+
+- After implementing any change to the app code (for example `app.py`, `ocr_chat_api.py`, `Dockerfile`, or `requirements.txt`), always run the **Quick Rebuild + Test** command above before considering the change complete.

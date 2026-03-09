@@ -190,13 +190,13 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
     st.divider()
     st.subheader("Extracted Lab Report Text")
 
-    rendered = _render_markdown_with_images(
-        st.session_state.ocr_markdown,
-        st.session_state.ocr_images,
-    )
-    st.markdown(rendered, unsafe_allow_html=True)
-
-    with st.expander("View raw extracted markdown"):
+    with st.expander("Parsed content (click to view)", expanded=False):
+        rendered = _render_markdown_with_images(
+            st.session_state.ocr_markdown,
+            st.session_state.ocr_images,
+        )
+        st.markdown(rendered, unsafe_allow_html=True)
+        st.caption("Raw extracted markdown")
         st.code(st.session_state.ocr_markdown, language="markdown")
 
     # ── Chat section ──────────────────────────────────────────────────────────
