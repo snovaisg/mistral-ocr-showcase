@@ -1,115 +1,85 @@
 ---
-title: Mistral OCR Showcase
-emoji: 📄
+title: Lab Results Extractor
+emoji: 🧪
 colorFrom: blue
-colorTo: purple
+colorTo: cyan
 sdk: docker
 app_port: 7860
 pinned: false
 ---
 
-# Mistral OCR Showcase
+# Lab Results Extractor
 
 Hugging Face Space: https://huggingface.co/spaces/snovaisg/mistral-ocr-showcase
 
 ## Overview
 
-A Streamlit application that demonstrates Mistral's OCR model (`mistral-ocr-latest`). Users supply their own API keys, drop in a PDF (or paste a URL), run OCR to get structured markdown output with embedded images, and then chat about the extracted content using GPT-4o.
+This project is a Streamlit app for extracting and reviewing lab report data:
+- OCR extraction from PDF lab reports using Mistral (`mistral-ocr-latest`)
+- Follow-up structured analysis via OpenAI (`gpt-4o`)
+- Side-by-side UX for extraction output and guided prompts
 
----
+Users provide their own API keys at runtime.
+
+## Project Structure
+
+- `app.py`: Streamlit UI, state management, rendering, interaction flow
+- `ocr_chat_api.py`: isolated API methods for Mistral OCR and OpenAI chat calls
+- `requirements.txt`: pinned runtime dependencies
+- `Dockerfile`: container runtime used by Hugging Face Space
 
 ## Features
 
-### Sidebar (left panel)
-- **Mistral API Key** — password input, used for OCR processing
-- **OpenAI API Key** — password input, used for the chat section
-- **Document input** — toggle between two modes:
-  - **Upload PDF** — drag-and-drop area or click-to-browse file uploader
-  - **Enter URL** — paste a direct link to any publicly accessible PDF
+- PDF upload or public PDF URL input
+- OCR markdown rendering with embedded inline images
+- Raw OCR markdown inspector
+- Lab-focused chat prompts for:
+  - biomarker tables
+  - abnormal/out-of-range value detection
+  - follow-up discussion prep
 
-### Main area (center / right)
-- **Apply Mistral OCR** button — runs `mistral-ocr-latest` against the selected document; disabled until both a Mistral key and a document source are provided
-- **OCR Results** — rendered markdown output with images embedded inline as base64 data URLs (auto-detected MIME type: JPEG, PNG, GIF)
-- **Raw markdown expander** — collapsed by default; shows the raw markdown string for inspection or copying
-- **Chat about this document** — powered by `gpt-4o`:
-  - Full OCR markdown is sent as system context on every request
-  - Multi-turn conversation (history is kept in session state)
-  - **Clear chat** button resets the thread without re-running OCR
-  - Submitting a new question with a fresh context after clearing keeps the UI uncluttered
+## Run Locally
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| UI | Streamlit 1.54.0 |
-| OCR | Mistral `mistral-ocr-latest` via `mistralai` 1.12.2 |
-| Chat | OpenAI `gpt-4o` via `openai` 2.21.0 |
-| Deployment target | Hugging Face Spaces (Streamlit SDK) |
-
----
-
-## Running locally
-
-This project uses [uv](https://docs.astral.sh/uv/) for environment management.
-
-### Prerequisites
-
-Install `uv` if you don't have it:
+1. Install dependencies:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+pip install -r requirements.txt
 ```
 
-### First-time setup
-
-Clone/navigate to the project directory, then let `uv` create the virtual environment and install all dependencies from the lockfile:
+2. Start app:
 
 ```bash
-cd ideas/mistral-ocr-showcase
-uv sync
+streamlit run app.py
 ```
 
-That's it — `uv` reads `pyproject.toml` and `uv.lock` and installs the exact pinned versions into `.venv/`.
+3. Open:
 
-### Run the app
-
-```bash
-uv run streamlit run app.py
+```text
+http://localhost:8501
 ```
 
-Streamlit will open `http://localhost:8501` in your browser automatically.
+## Deploying to Hugging Face Spaces (Docker)
 
-### Adding or updating dependencies
+This repo is configured for Docker-based deployment on HF Spaces.
 
-```bash
-uv add <package>        # add a new dependency
-uv remove <package>     # remove a dependency
-uv lock --upgrade       # refresh the lockfile to latest compatible versions
-```
+- App listens on port `7860`
+- Streamlit is started with:
+  - `--server.address=0.0.0.0`
+  - `--server.enableCORS=false`
+  - `--server.enableXsrfProtection=false`
 
----
+These flags are set for proxy compatibility in HF Spaces and to avoid upload-related 403 errors.
 
-## Deploying to Hugging Face Spaces
+## GitHub Action Deployment
 
-1. Create a new Space with the **Streamlit** SDK.
-2. Upload `app.py` and `requirements.txt` to the Space repository.
-3. The Space will install dependencies and launch automatically — no secrets need to be pre-configured, as users supply their own API keys at runtime.
+Deployments are triggered from `main` via:
+- `.github/workflows/sync-to-hf-space.yml`
 
-### Auto-sync from GitHub (already configured in this repo)
+Required secret:
+- `HF_TOKEN`: Hugging Face token with write access to the target Space
 
-This repo includes a workflow at `.github/workflows/sync-to-hf-space.yml` that deploys every push to `main` into:
+## Dependencies
 
-- `snovaisg/mistral-ocr-showcase`
-
-To enable it, add this repository secret in GitHub:
-
-- `HF_TOKEN`: a Hugging Face User Access Token with write access to the Space.
-
----
-
-## Status
-
-Registered on 2026-02-17
-Last updated on 2026-02-17
+- `streamlit==1.54.0`
+- `mistralai==1.12.2`
+- `openai==2.21.0`
