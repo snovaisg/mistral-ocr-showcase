@@ -10,6 +10,8 @@ pinned: false
 
 # Mistral OCR Showcase
 
+Hugging Face Space: https://huggingface.co/spaces/snovaisg/mistral-ocr-showcase
+
 ## Overview
 
 A Streamlit application that demonstrates Mistral's OCR model (`mistral-ocr-latest`). Users supply their own API keys, drop in a PDF (or paste a URL), run OCR to get structured markdown output with embedded images, and then chat about the extracted content using GPT-4o.
