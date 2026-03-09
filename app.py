@@ -6,7 +6,7 @@ from openai import OpenAI
 
 # ─── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Mistral OCR Showcase",
+    page_title="Lab Results Extractor",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -31,6 +31,7 @@ for _k, _v in {
     "ocr_images": {},
     "ocr_done": False,
     "chat_history": [],
+    "chat_input": "",
 }.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
@@ -118,13 +119,14 @@ def _run_chat(
     question: str,
     history: list[tuple[str, str]],
 ) -> str:
-    """Send a question to GPT-4o with the OCR markdown as context."""
+    """Send a lab-report extraction question to GPT-4o with OCR markdown context."""
     client = OpenAI(api_key=api_key)
 
     system_msg = (
-        "You are a helpful assistant that answers questions about a document that was "
-        "processed with an OCR model. Base your answers solely on the document content "
-        "provided below.\n\n"
+        "You are a clinical document extraction assistant focused on lab reports. "
+        "Extract and explain information only from the OCR content below. "
+        "When relevant, provide structured tables with: test name, value, unit, "
+        "reference range, and abnormality flag. If data is missing, say so clearly.\n\n"
         "--- DOCUMENT CONTENT (OCR) ---\n"
         f"{markdown_content}\n"
         "--- END OF DOCUMENT ---"
@@ -141,8 +143,8 @@ def _run_chat(
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("Mistral OCR")
-    st.caption("Configure your keys, then drop in a document.")
+    st.title("Lab Results Extractor")
+    st.caption("Configure your keys, then upload a lab report PDF for extraction.")
 
     # API keys
     st.subheader("API Keys")
@@ -162,7 +164,7 @@ with st.sidebar:
     st.divider()
 
     # Document input
-    st.subheader("Document")
+    st.subheader("Lab Report Input")
     input_method = st.radio(
         "Input method",
         ["Upload PDF", "Enter URL"],
@@ -174,25 +176,25 @@ with st.sidebar:
 
     if input_method == "Upload PDF":
         uploaded_file = st.file_uploader(
-            "Upload PDF",
+            "Upload lab report PDF",
             type=["pdf"],
             label_visibility="collapsed",
-            help="Drag & drop a PDF here, or click to browse.",
+            help="Drag and drop a lab result PDF, or click to browse.",
         )
         if uploaded_file:
             st.success(f"Ready: **{uploaded_file.name}**")
     else:
         pdf_url = st.text_input(
-            "PDF URL",
-            placeholder="https://example.com/document.pdf",
+            "Lab report PDF URL",
+            placeholder="https://example.com/lab-results.pdf",
             label_visibility="collapsed",
         )
 
 # ─── Main area ────────────────────────────────────────────────────────────────
-st.title("Mistral OCR Showcase")
+st.title("Lab Results Information Extractor")
 st.caption(
-    "Extract structured text from a PDF using Mistral's OCR model, "
-    "then chat about the content with GPT-4o."
+    "Extract text from laboratory reports with Mistral OCR, then use GPT-4o to "
+    "identify biomarkers, reference ranges, out-of-range values, trends, and follow-up questions."
 )
 
 # Readiness flags
@@ -201,7 +203,7 @@ can_ocr = bool(mistral_key) and has_document
 
 # ── OCR button ────────────────────────────────────────────────────────────────
 ocr_btn = st.button(
-    "Apply Mistral OCR",
+    "Extract Lab Report Text",
     type="primary",
     disabled=not can_ocr,
     help=(
@@ -213,12 +215,12 @@ ocr_btn = st.button(
 
 if not has_document and not st.session_state.ocr_done:
     st.info(
-        "Add your **Mistral API key** and select a **PDF document** in the sidebar "
-        "to get started."
+        "Add your **Mistral API key** and select a **lab report PDF** in the sidebar "
+        "to start extraction."
     )
 
 if ocr_btn and can_ocr:
-    with st.spinner("Running Mistral OCR — this may take a moment…"):
+    with st.spinner("Extracting lab report text with Mistral OCR..."):
         try:
             pdf_bytes = uploaded_file.read() if uploaded_file else None
             url = pdf_url.strip() if not pdf_bytes else None
@@ -236,7 +238,7 @@ if ocr_btn and can_ocr:
 # ── OCR results ───────────────────────────────────────────────────────────────
 if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
     st.divider()
-    st.subheader("OCR Results")
+    st.subheader("Extracted Lab Report Text")
 
     rendered = _render_markdown_with_images(
         st.session_state.ocr_markdown,
@@ -244,7 +246,7 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
     )
     st.markdown(rendered, unsafe_allow_html=True)
 
-    with st.expander("View raw markdown"):
+    with st.expander("View raw extracted markdown"):
         st.code(st.session_state.ocr_markdown, language="markdown")
 
     # ── Chat section ──────────────────────────────────────────────────────────
@@ -252,13 +254,27 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
 
     hdr_col, clear_col = st.columns([5, 1])
     with hdr_col:
-        st.subheader("Chat about this document")
-        st.caption("Ask GPT-4o anything about the extracted text. Clear the thread to start fresh.")
+        st.subheader("Lab Result Extraction Assistant")
+        st.caption("Ask GPT-4o to extract structured findings from the report. Clear the thread to start fresh.")
     with clear_col:
         st.write("")  # vertical alignment nudge
         if st.button("Clear chat", help="Reset the conversation history"):
             st.session_state.chat_history = []
+            st.session_state.chat_input = ""
             st.rerun()
+
+    st.write("Quick extraction prompts:")
+    prompt_cols = st.columns(3)
+    prompt_options = [
+        "Extract all biomarkers with result, unit, and reference range in a table.",
+        "List all abnormal or out-of-range values and explain why each is abnormal.",
+        "Summarize key findings and suggested follow-up questions for my doctor.",
+    ]
+    for idx, prompt in enumerate(prompt_options):
+        with prompt_cols[idx]:
+            if st.button(f"Use prompt {idx + 1}", key=f"quick_prompt_{idx}"):
+                st.session_state.chat_input = prompt
+                st.rerun()
 
     if not openai_key:
         st.warning("Add your **OpenAI API key** in the sidebar to enable the chat.")
@@ -271,12 +287,13 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
                 st.write(a)
 
         # Question input
-        with st.form("chat_form", clear_on_submit=True):
+        with st.form("chat_form", clear_on_submit=False):
             user_question = st.text_area(
                 "Your question",
-                placeholder="e.g. What is the main topic of this document?",
+                placeholder="e.g. Extract CBC and CMP values with flags for high/low results.",
                 height=90,
                 label_visibility="collapsed",
+                key="chat_input",
             )
             submit_btn = st.form_submit_button("Submit", type="primary")
 
@@ -292,6 +309,7 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
                     st.session_state.chat_history.append(
                         (user_question.strip(), answer)
                     )
+                    st.session_state.chat_input = ""
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Chat failed: {exc}")
