@@ -1,8 +1,7 @@
 import re
 
 import streamlit as st
-from mistralai import Mistral
-from openai import OpenAI
+from ocr_chat_api import run_chat, run_ocr
 
 # ─── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -38,27 +37,6 @@ for _k, _v in {
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-
-def _run_ocr(api_key: str, pdf_bytes: bytes | None = None, url: str | None = None):
-    """Call Mistral OCR and return the raw response."""
-    client = Mistral(api_key=api_key)
-
-    if pdf_bytes:
-        upload = client.files.upload(
-            file={"file_name": "document.pdf", "content": pdf_bytes},
-            purpose="ocr",
-        )
-        signed = client.files.get_signed_url(file_id=upload.id)
-        doc = {"type": "document_url", "document_url": signed.url}
-    else:
-        doc = {"type": "document_url", "document_url": url}
-
-    return client.ocr.process(
-        model="mistral-ocr-latest",
-        document=doc,
-        include_image_base64=True,
-    )
-
 
 def _combine_markdown(ocr_response) -> str:
     """Concatenate all pages' markdown with page dividers."""
@@ -111,34 +89,6 @@ def _render_markdown_with_images(markdown: str, images: dict) -> str:
         return match.group(0)
 
     return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _replace, markdown)
-
-
-def _run_chat(
-    api_key: str,
-    markdown_content: str,
-    question: str,
-    history: list[tuple[str, str]],
-) -> str:
-    """Send a lab-report extraction question to GPT-4o with OCR markdown context."""
-    client = OpenAI(api_key=api_key)
-
-    system_msg = (
-        "You are a clinical document extraction assistant focused on lab reports. "
-        "Extract and explain information only from the OCR content below. "
-        "When relevant, provide structured tables with: test name, value, unit, "
-        "reference range, and abnormality flag. If data is missing, say so clearly.\n\n"
-        "--- DOCUMENT CONTENT (OCR) ---\n"
-        f"{markdown_content}\n"
-        "--- END OF DOCUMENT ---"
-    )
-    messages = [{"role": "system", "content": system_msg}]
-    for q, a in history:
-        messages.append({"role": "user", "content": q})
-        messages.append({"role": "assistant", "content": a})
-    messages.append({"role": "user", "content": question})
-
-    resp = client.chat.completions.create(model="gpt-4o", messages=messages)
-    return resp.choices[0].message.content
 
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -225,7 +175,7 @@ if ocr_btn and can_ocr:
             pdf_bytes = uploaded_file.read() if uploaded_file else None
             url = pdf_url.strip() if not pdf_bytes else None
 
-            result = _run_ocr(mistral_key, pdf_bytes=pdf_bytes, url=url)
+            result = run_ocr(mistral_key, pdf_bytes=pdf_bytes, url=url)
 
             st.session_state.ocr_markdown = _combine_markdown(result)
             st.session_state.ocr_images = _build_image_map(result)
@@ -300,7 +250,7 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
         if submit_btn and user_question.strip():
             with st.spinner("Thinking…"):
                 try:
-                    answer = _run_chat(
+                    answer = run_chat(
                         openai_key,
                         st.session_state.ocr_markdown,
                         user_question.strip(),
