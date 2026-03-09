@@ -8,8 +8,28 @@
 
 ## Local Testing Before Push
 
-- Use the local `uv` environment before each push.
+- Use local Docker to validate the same container runtime used in Hugging Face Spaces before each push.
 - Recommended check sequence:
-  1. `uv sync`
-  2. `uv run streamlit run app.py`
-- Verify upload + OCR + chat behavior locally before pushing to `main`.
+  1. Rebuild image after code changes:
+```bash
+docker build -t lab-results-extractor:local .
+```
+  2. Run container for local test:
+```bash
+docker run --rm -p 7860:7860 --name lab-results-extractor lab-results-extractor:local
+```
+  3. Open app:
+     - `http://localhost:7860`
+  4. Verify critical behavior:
+     - PDF upload works
+     - OCR extraction runs with your Mistral key
+     - Chat follow-up works with your OpenAI key
+  5. Stop test run:
+     - `Ctrl+C` in the container terminal (or `docker stop lab-results-extractor` from another terminal)
+- Push to `main` only after Docker local checks pass.
+
+## Quick Rebuild + Test
+
+```bash
+docker build -t lab-results-extractor:local . && docker run --rm -p 7860:7860 --name lab-results-extractor lab-results-extractor:local
+```

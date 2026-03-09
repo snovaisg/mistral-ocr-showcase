@@ -237,7 +237,7 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
                 st.write(a)
 
         # Question input
-        with st.form("chat_form", clear_on_submit=False):
+        with st.form("chat_form", clear_on_submit=True):
             user_question = st.text_area(
                 "Your question",
                 placeholder="e.g. Extract CBC and CMP values with flags for high/low results.",
@@ -259,7 +259,6 @@ if st.session_state.ocr_done and st.session_state.ocr_markdown is not None:
                     st.session_state.chat_history.append(
                         (user_question.strip(), answer)
                     )
-                    st.session_state.chat_input = ""
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Chat failed: {exc}")
