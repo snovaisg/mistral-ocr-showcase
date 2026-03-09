@@ -95,6 +95,16 @@ uv lock --upgrade       # refresh the lockfile to latest compatible versions
 2. Upload `app.py` and `requirements.txt` to the Space repository.
 3. The Space will install dependencies and launch automatically — no secrets need to be pre-configured, as users supply their own API keys at runtime.
 
+### Auto-sync from GitHub (already configured in this repo)
+
+This repo includes a workflow at `.github/workflows/sync-to-hf-space.yml` that deploys every push to `main` into:
+
+- `snovaisg/mistral-ocr-showcase`
+
+To enable it, add this repository secret in GitHub:
+
+- `HF_TOKEN`: a Hugging Face User Access Token with write access to the Space.
+
 ---
 
 ## Status
